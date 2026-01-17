@@ -26,6 +26,8 @@ const API_KEY_PROVIDERS = [
   { id: 'openai', name: 'OpenAI', prefix: 'sk-', placeholder: 'sk-...' },
   { id: 'google', name: 'Google AI', prefix: 'AIza', placeholder: 'AIza...' },
   { id: 'xai', name: 'xAI (Grok)', prefix: 'xai-', placeholder: 'xai-...' },
+  { id: 'zai', name: 'Z.AI', prefix: '', placeholder: 'Enter Z.AI API key' },
+  { id: 'zai-coding-plan', name: 'Z.AI Coding Plan', prefix: '', placeholder: 'Enter Z.AI API key' },
 ] as const;
 
 type ProviderId = typeof API_KEY_PROVIDERS[number]['id'];
@@ -171,7 +173,7 @@ export default function SettingsDialog({ open, onOpenChange, onApiKeySaved }: Se
       return;
     }
 
-    if (!trimmedKey.startsWith(currentProvider.prefix)) {
+    if (currentProvider.prefix && !trimmedKey.startsWith(currentProvider.prefix)) {
       setError(`Invalid API key format. Key should start with ${currentProvider.prefix}`);
       return;
     }
@@ -197,6 +199,29 @@ export default function SettingsDialog({ open, onOpenChange, onApiKeySaved }: Se
         const filtered = prev.filter((k) => k.provider !== savedKey.provider);
         return [...filtered, savedKey];
       });
+
+      // Auto-select default model for Z.AI if no Z.AI model is selected
+      if (provider === 'zai' || provider === 'zai-coding-plan') {
+        const currentModel = selectedModel;
+        const isZaiModel = currentModel?.provider === 'zai' || currentModel?.provider === 'zai-coding-plan';
+
+        if (!isZaiModel) {
+          const defaultModel = 'zai/glm-4.7';
+          analytics.trackSelectModel('GLM-4.7');
+          const newSelection = {
+            provider: 'zai' as const,
+            model: defaultModel,
+          };
+          try {
+            await accomplish.setSelectedModel(newSelection);
+            setSelectedModel(newSelection);
+            setStatusMessage(`${currentProvider.name} API key saved. Model set to GLM-4.7.`);
+          } catch (err) {
+            console.error('Failed to set default model:', err);
+          }
+        }
+      }
+
       onApiKeySaved?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save API key.';

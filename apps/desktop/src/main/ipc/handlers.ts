@@ -74,7 +74,7 @@ import {
 } from '../test-utils/mock-task-flow';
 
 const MAX_TEXT_LENGTH = 8000;
-const ALLOWED_API_KEY_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'xai', 'custom']);
+const ALLOWED_API_KEY_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'xai', 'zai', 'zai-coding-plan', 'custom']);
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 
 interface OllamaModel {
@@ -687,8 +687,17 @@ export function registerIPCHandlers(): void {
       const sanitizedKey = sanitizeString(key, 'apiKey', 256);
       const sanitizedLabel = label ? sanitizeString(label, 'label', 128) : undefined;
 
-      // Store the API key securely in OS keychain
+      // Store API key securely in OS keychain
       await storeApiKey(provider, sanitizedKey);
+
+      // Sync Z.AI keys between providers
+      if (provider === 'zai') {
+        await storeApiKey('zai-coding-plan', sanitizedKey);
+        console.log('[API Key] Synced zai key to zai-coding-plan');
+      } else if (provider === 'zai-coding-plan') {
+        await storeApiKey('zai', sanitizedKey);
+        console.log('[API Key] Synced zai-coding-plan key to zai');
+      }
 
       return {
         id: `local-${provider}`,
@@ -834,6 +843,21 @@ export function registerIPCHandlers(): void {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${sanitizedKey}`,
+              },
+            },
+            API_KEY_VALIDATION_TIMEOUT_MS
+          );
+          break;
+
+        case 'zai':
+        case 'zai-coding-plan':
+          response = await fetchWithTimeout(
+            'https://api.z.ai/api/paas/v4/models',
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${sanitizedKey}`,
+                'Content-Type': 'application/json',
               },
             },
             API_KEY_VALIDATION_TIMEOUT_MS

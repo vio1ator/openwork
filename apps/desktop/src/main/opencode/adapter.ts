@@ -378,6 +378,13 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
       console.log('[OpenCode CLI] Using xAI API key from settings');
     }
 
+    // Set Z.AI API key (shared between zai and zai-coding-plan)
+    const zaiKey = apiKeys.zai || apiKeys['zai-coding-plan'];
+    if (zaiKey) {
+      env.ZHIPU_API_KEY = zaiKey;
+      console.log('[OpenCode CLI] Using Z.AI API key from settings');
+    }
+
     // Set Ollama host if configured
     const selectedModel = getSelectedModel();
     if (selectedModel?.provider === 'ollama' && selectedModel.baseUrl) {

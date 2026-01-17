@@ -20,7 +20,7 @@ Task: `;
  */
 export async function generateTaskSummary(prompt: string): Promise<string> {
   // Try providers in order of preference
-  const providers: ApiKeyProvider[] = ['anthropic', 'openai', 'google', 'xai'];
+  const providers: ApiKeyProvider[] = ['anthropic', 'openai', 'google', 'xai', 'zai'];
 
   for (const provider of providers) {
     const apiKey = getApiKey(provider);
@@ -57,6 +57,8 @@ async function callProvider(
       return callGoogle(apiKey, prompt);
     case 'xai':
       return callXAI(apiKey, prompt);
+    case 'zai':
+      return callZAI(apiKey, prompt);
     default:
       return null;
   }
@@ -176,6 +178,36 @@ async function callXAI(apiKey: string, prompt: string): Promise<string> {
 
   if (!response.ok) {
     throw new Error(`xAI API error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+  const text = data.choices?.[0]?.message?.content;
+  return cleanSummary(text || '');
+}
+
+async function callZAI(apiKey: string, prompt: string): Promise<string> {
+  const response = await fetch('https://api.z.ai/api/paas/v4/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'glm-4.5-flash',
+      max_tokens: 50,
+      messages: [
+        {
+          role: 'user',
+          content: SUMMARY_PROMPT + prompt,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Z.AI API error: ${response.status}`);
   }
 
   const data = (await response.json()) as {
